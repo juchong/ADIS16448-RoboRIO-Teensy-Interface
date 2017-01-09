@@ -5,11 +5,11 @@
 //  ADIS16448_RoboRIO_Teensy_Interface.ino
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-//  This Arduino project interfaces an ADIS16448 IMU to a RoboRIO via UART (Serial). 
+//  This Arduino project interfaces an ADIS16448 IMU to a RoboRIO via UART (Serial1). 
 //  The Arduino software provides a means of extracting IMU data while precicely controlling 
 //  software timing. In addition, this software greatly reduces the processing overhead
 //  required to acquire and calculate heading using only the RoboRIO. Gyro offset calibration
-//  and heading reset are currently supported using ASCII serial commands sent via serail. 
+//  and heading reset are currently supported using ASCII Serial1 commands sent via serail. 
 //
 //  This library relies on the ADIS16448 Arduino Teensy library which may be found
 //  here: https://github.com/juchong/ADIS16448-Arduino-Teensy
@@ -59,6 +59,8 @@
 int16_t *burstData;
 float scaledData[11];
 float pitch, roll, yaw, xdelta, ydelta, zdelta;
+String datapacket = "";
+String separator = ',';
 
 // Delay counter variable
 int printCounter = 0;
@@ -82,8 +84,7 @@ SimpleGyroIntegrator SGI;
 
 // Initial configuration and initialization
 void setup() {
-  Serial.begin(115200);
-  
+  Serial1.begin(115200);
   IMU.configSPI();
   IMU.regWrite(MSC_CTRL, 0x06);  // Enable Data Ready, set polarity
   delay(20); 
@@ -133,24 +134,24 @@ void scaleData() {
 // IMU calibration routine
 void calibrateIMU() {
   detachInterrupt(2); //Detach interrupt to avoid overwriting data
-  Serial.println("Make sure the sensor is in a stable position!");
-  Serial.print("Starting in ");
-  Serial.print("5... ");
+  Serial1.println("Make sure the sensor is in a stable position!");
+  Serial1.print("Starting in ");
+  Serial1.print("5... ");
   delay(1000);
-  Serial.print("4... ");
+  Serial1.print("4... ");
   delay(1000);
-  Serial.print("3... ");
+  Serial1.print("3... ");
   delay(1000);
-  Serial.print("2... ");
+  Serial1.print("2... ");
   delay(1000);
-  Serial.println("1... ");
+  Serial1.println("1... ");
   delay(1000);
-  Serial.println("Recording data. This will take ~25 Seconds. Do not move the sensor!");
+  Serial1.println("Recording data. This will take ~25 Seconds. Do not move the sensor!");
   IMU.regWrite(SENS_AVG, 0x102); // Set gyro range to 250dps
   delay(50);
   IMU.regWrite(SMPL_PRD, 0xE01); //Set averaging to ~25 seconds
   for(int i = 0; i < 25; i++) {
-    Serial.print(".");
+    Serial1.print(".");
     delay(1000);
   }  
   IMU.regWrite(GLOB_CMD,0x01); // Write offset data to offset registers
@@ -165,26 +166,26 @@ void calibrateIMU() {
   delay(50);
   IMU.regWrite(GLOB_CMD,0x08); // Write configuration to IMU flash
   delay(1000);
-  Serial.println(" ");
-  Serial.println("Offsets have been recorded! Here's what was written to the sensor:");
+  Serial1.println(" ");
+  Serial1.println("Offsets have been recorded! Here's what was written to the sensor:");
   int16_t xgoffset = IMU.regRead(XGYRO_OFF);
   int16_t ygoffset = IMU.regRead(YGYRO_OFF);
   int16_t zgoffset = IMU.regRead(ZGYRO_OFF);
-  Serial.print("XGYRO_OFF: ");
-  Serial.println(xgoffset);
-  Serial.print("YGYRO_OFF: ");
-  Serial.println(ygoffset);
-  Serial.print("ZGYRO_OFF: ");
-  Serial.println(zgoffset);
+  Serial1.print("XGYRO_OFF: ");
+  Serial1.println(xgoffset);
+  Serial1.print("YGYRO_OFF: ");
+  Serial1.println(ygoffset);
+  Serial1.print("ZGYRO_OFF: ");
+  Serial1.println(zgoffset);
   delay(5000);
   calFlag = 0; // Clear cal flag
   attachInterrupt(2, grabData, RISING); // Re-attach interrupt to pin 2. Trigger on the rising edge
 }
 
-// Function to act upon serial data received from the host
-void serialEvent() {
-  while (Serial.available()) {
-    char inChar = (char)Serial.read();
+// Function to act upon Serial1 data received from the host
+void Serial1Event() {
+  while (Serial1.available()) {
+    char inChar = (char)Serial1.read();
     if (inChar == 'c') {
       calFlag = 1;
     }
@@ -196,41 +197,34 @@ void serialEvent() {
 
 void loop() {
   printCounter ++;
-    if (printCounter >= 10000) // Delay for writing data to the serial port
+    if (printCounter >= 10000) // Delay for writing data to the Serial1 port
     {
-        //detachInterrupt(2); //Detach interrupt to avoid overwriting data
-
-        //Clear the serial terminal and reset cursor
-        //Only works on supported serial terminal programs (Putty)
-        Serial.print("\033[2J");
-        Serial.print("\033[H");
         
-        // Print scaled gyro data
-        Serial.print("Pitch: ");
+        // Gather packet data...
         pitch = AHRS.getPitch();
-        Serial.println(pitch);
-        
-        Serial.print("Roll: ");
         roll = AHRS.getRoll();
-        Serial.println(roll);
-        
-        Serial.print("Yaw: ");
         yaw = AHRS.getYaw();
-        Serial.println(yaw);
-
-        Serial.println(" ");
-
-        Serial.print("XDelta: ");
         xdelta = SGI.getX();
-        Serial.println(xdelta);
-        
-        Serial.print("YDelta: ");
         ydelta = SGI.getY();
-        Serial.println(ydelta);
-        
-        Serial.print("ZDelta: ");
         zdelta = SGI.getZ();
-        Serial.println(zdelta);
+
+        // Print data packet
+
+        datapacket += pitch;
+        datapacket += separator;
+        datapacket += roll;
+        datapacket += separator;
+        datapacket += yaw;
+        datapacket += separator;
+        datapacket += xdelta;
+        datapacket += separator;
+        datapacket += ydelta;
+        datapacket += separator;
+        datapacket += zdelta;
+
+        Serial1.println(datapacket);
+
+        datapacket = "";
         
         printCounter = 0;
     }
