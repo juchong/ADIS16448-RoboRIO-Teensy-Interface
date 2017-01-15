@@ -65,6 +65,9 @@ String separator = ',';
 // Delay counter variable
 int printCounter = 0;
 
+// Z mounting orientation
+bool initOrientation = true; //true = ZUP, false = ZDOWN
+
 // Program flags
 int calFlag = 0;
 int resetGyroFlag = 0;
@@ -109,8 +112,17 @@ void grabData() {
       deltat = 1025;
     }
     oldtime = micros(); // Update delta time variable for next iteration
+    
     SGI.update(scaledData[0], scaledData[1], scaledData[2], deltat, resetGyroFlag); // Integrate gyros over time
-    AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
+
+    if (initOrientation == true) {
+    	AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
+    }
+    else {
+    	AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
+    }
+    
+
     if (resetGyroFlag == 1) {
       resetGyroFlag = 0;
     }
@@ -191,6 +203,12 @@ void serialEvent1() {
     }
     if (inChar == 'r') {
       resetGyroFlag = 1;
+    }
+    if (inChar == 'u') {
+    	initOrientation = true;
+    }
+    if (inChar == 'd') {
+    	initOrientation = false;
     }
   }
 }
