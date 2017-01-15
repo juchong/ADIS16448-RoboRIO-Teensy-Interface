@@ -183,7 +183,7 @@ void calibrateIMU() {
 }
 
 // Function to act upon Serial1 data received from the host
-void Serial1Event() {
+void serialEvent1() {
   while (Serial1.available()) {
     char inChar = (char)Serial1.read();
     if (inChar == 'c') {
