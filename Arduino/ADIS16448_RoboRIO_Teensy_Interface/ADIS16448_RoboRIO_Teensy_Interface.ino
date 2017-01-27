@@ -51,9 +51,10 @@
 #include <MadgwickAHRS.h>
 #include <SimpleGyroIntegrator.h>
 #include <SPI.h>
+#include <EEPROMex.h>
 
-// Uncomment to enable debug
 //#define DEBUG
+#define HWSERIAL Serial1
 
 // Initialize data variables
 int16_t *burstData;
@@ -61,6 +62,15 @@ float scaledData[11];
 float pitch, roll, yaw, xdelta, ydelta, zdelta;
 String datapacket = "";
 String separator = ',';
+float calDataX = 0;
+float calDataY = 0;
+float calDataZ = 0;
+int calCounter = 0;
+
+// EEPROM initialization
+int calXloc = 0;
+int calYloc = 5;
+int calZloc = 10;
 
 // Delay counter variable
 int printCounter = 0;
@@ -69,8 +79,9 @@ int printCounter = 0;
 bool initOrientation = true; //true = ZUP, false = ZDOWN
 
 // Program flags
-int calFlag = 0;
+int internalCalFlag = 0;
 int resetGyroFlag = 0;
+bool teensyCalFlag = false;
 
 // Delta time variables
 unsigned long oldtime = 0;
@@ -87,7 +98,7 @@ SimpleGyroIntegrator SGI;
 
 // Initial configuration and initialization
 void setup() {
-  Serial1.begin(115200);
+  HWSERIAL.begin(115200);
   IMU.configSPI();
   IMU.regWrite(MSC_CTRL, 0x06);  // Enable Data Ready, set polarity
   delay(20); 
@@ -96,15 +107,23 @@ void setup() {
   IMU.regWrite(SMPL_PRD, 0x01), // Disable decimation
   delay(20);
 
+  calDataX = EEPROM.readFloat(calXloc);
+  calDataY = EEPROM.readFloat(calYloc);
+  calDataZ = EEPROM.readFloat(calZloc);
+
   attachInterrupt(2, grabData, RISING); // Attach interrupt to pin 2. Trigger on the rising edge
 
 }
 
 // Read data from the sensor using burst mode, scale data, and update SGI/AHRS loops. Check for cal flag before reading next frame of data.
 void grabData() {
-  if (calFlag == 1) {
-    calibrateIMU();
+  if (internalCalFlag == 1) {
+    calibrateOffsetRegisterIMU();
   }
+  if (teensyCalFlag == true) {
+    calibrateTeensy();
+  }
+  else {
     burstData = IMU.burstRead(); // Read data and insert into array
     scaleData(); // Scale IMU data
     deltat = micros() - oldtime; // Calculate delta time from last interrupt
@@ -114,18 +133,18 @@ void grabData() {
     oldtime = micros(); // Update delta time variable for next iteration
     
     SGI.update(scaledData[0], scaledData[1], scaledData[2], deltat, resetGyroFlag); // Integrate gyros over time
-
+  
     if (initOrientation == true) {
-    	AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
+      AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
     }
     else {
-    	AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
+      AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
     }
     
-
     if (resetGyroFlag == 1) {
       resetGyroFlag = 0;
     }
+  }
 }
 
 // Function used to scale all acquired data (scaling functions are included in ADIS16448.cpp)
@@ -139,31 +158,55 @@ void scaleData() {
     scaledData[6] = IMU.magnetometerScale(*(burstData + 7)); //Scale X Mag
     scaledData[7] = IMU.magnetometerScale(*(burstData + 8)); //Scale Y Mag
     scaledData[8] = IMU.magnetometerScale(*(burstData + 9)); //Scale Z Mag
+    // Subtract offsets from gyro signal
+    scaledData[0] = scaledData[0] - calDataX;
+    scaledData[1] = scaledData[1] - calDataY;
+    scaledData[2] = scaledData[2] - calDataZ;
     //scaledData[9] = IMU.pressureScale(*(burstData + 10)); //Scale Pressure Sensor
     //scaledData[10] = IMU.tempScale(*(burstData + 11)); //Scale Temp Sensor
 }
 
+void calibrateTeensy() {
+  //HWSERIAL.println("We're in cal mode");
+  burstData = IMU.burstRead(); // Read data and insert into array
+  scaleData();
+  calDataX = scaledData[0] + calDataX;
+  calDataY = scaledData[1] + calDataY;
+  calDataZ = scaledData[2] + calDataZ;
+  calCounter = calCounter + 1;
+  if (calCounter >= 8192) {
+    //calDataX = calDataX * 0.0004070004;
+    //calDataY = calDataY * 0.0004070004;
+    //calDataZ = calDataZ * 0.0004070004;
+    EEPROM.writeFloat(calXloc,calDataX);
+    EEPROM.writeFloat(calYloc,calDataY);
+    EEPROM.writeFloat(calZloc,calDataZ);
+    teensyCalFlag = false;
+    calCounter = 0;
+  }
+}
+
 // IMU calibration routine
-void calibrateIMU() {
+void calibrateOffsetRegisterIMU() {
   detachInterrupt(2); //Detach interrupt to avoid overwriting data
-  Serial1.println("Make sure the sensor is in a stable position!");
-  Serial1.print("Starting in ");
-  Serial1.print("5... ");
+  HWSERIAL.println("Make sure the sensor is in a stable position!");
+  HWSERIAL.print("Starting in ");
+  HWSERIAL.print("5... ");
   delay(1000);
-  Serial1.print("4... ");
+  HWSERIAL.print("4... ");
   delay(1000);
-  Serial1.print("3... ");
+  HWSERIAL.print("3... ");
   delay(1000);
-  Serial1.print("2... ");
+  HWSERIAL.print("2... ");
   delay(1000);
-  Serial1.println("1... ");
+  HWSERIAL.println("1... ");
   delay(1000);
-  Serial1.println("Recording data. This will take ~25 Seconds. Do not move the sensor!");
+  HWSERIAL.println("Recording data. This will take ~25 Seconds. Do not move the sensor!");
   IMU.regWrite(SENS_AVG, 0x102); // Set gyro range to 250dps
   delay(50);
   IMU.regWrite(SMPL_PRD, 0xE01); //Set averaging to ~25 seconds
   for(int i = 0; i < 25; i++) {
-    Serial1.print(".");
+    HWSERIAL.print(".");
     delay(1000);
   }  
   IMU.regWrite(GLOB_CMD,0x01); // Write offset data to offset registers
@@ -178,28 +221,28 @@ void calibrateIMU() {
   delay(50);
   IMU.regWrite(GLOB_CMD,0x08); // Write configuration to IMU flash
   delay(1000);
-  Serial1.println(" ");
-  Serial1.println("Offsets have been recorded! Here's what was written to the sensor:");
+  HWSERIAL.println(" ");
+  HWSERIAL.println("Offsets have been recorded! Here's what was written to the sensor:");
   int16_t xgoffset = IMU.regRead(XGYRO_OFF);
   int16_t ygoffset = IMU.regRead(YGYRO_OFF);
   int16_t zgoffset = IMU.regRead(ZGYRO_OFF);
-  Serial1.print("XGYRO_OFF: ");
-  Serial1.println(xgoffset);
-  Serial1.print("YGYRO_OFF: ");
-  Serial1.println(ygoffset);
-  Serial1.print("ZGYRO_OFF: ");
-  Serial1.println(zgoffset);
+  HWSERIAL.print("XGYRO_OFF: ");
+  HWSERIAL.println(xgoffset);
+  HWSERIAL.print("YGYRO_OFF: ");
+  HWSERIAL.println(ygoffset);
+  HWSERIAL.print("ZGYRO_OFF: ");
+  HWSERIAL.println(zgoffset);
   delay(5000);
-  calFlag = 0; // Clear cal flag
+  internalCalFlag = 0; // Clear cal flag
   attachInterrupt(2, grabData, RISING); // Re-attach interrupt to pin 2. Trigger on the rising edge
 }
 
 // Function to act upon Serial1 data received from the host
 void serialEvent1() {
-  while (Serial1.available()) {
-    char inChar = (char)Serial1.read();
+  while (HWSERIAL.available()) {
+    char inChar = (char)HWSERIAL.read();
     if (inChar == 'c') {
-      calFlag = 1;
+      internalCalFlag = 1;
     }
     if (inChar == 'r') {
       resetGyroFlag = 1;
@@ -209,6 +252,9 @@ void serialEvent1() {
     }
     if (inChar == 'd') {
     	initOrientation = false;
+    }
+    if (inChar == 'a') {
+      teensyCalFlag = true;
     }
   }
 }
@@ -240,7 +286,12 @@ void loop() {
         datapacket += separator;
         datapacket += zdelta;
 
-        Serial1.println(datapacket);
+        HWSERIAL.println(datapacket);
+        #ifdef DEBUG
+          HWSERIAL.println(calDataX);
+          HWSERIAL.println(calDataY);
+          HWSERIAL.println(calDataZ);
+        #endif
 
         datapacket = "";
         
