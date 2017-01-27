@@ -13,8 +13,8 @@
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build"/>
 	</Item>
-	<Item Name="roboRIO-2655-FRC" Type="RT roboRIO">
-		<Property Name="alias.name" Type="Str">roboRIO-2655-FRC</Property>
+	<Item Name="roboRIO" Type="RT roboRIO">
+		<Property Name="alias.name" Type="Str">roboRIO</Property>
 		<Property Name="alias.value" Type="Str">172.22.11.2</Property>
 		<Property Name="CCSymbols" Type="Str">OS,Linux;CPU,ARM;DeviceCode,76F2;TARGET_TYPE,RT;</Property>
 		<Property Name="crio.ControllerPID" Type="Str">76F2</Property>
@@ -96,8 +96,8 @@ DirectoryIndex index.htm
 		<Property Name="target.WebServer.ViAccess" Type="Str">+*</Property>
 		<Property Name="target.webservices.SecurityAPIKey" Type="Str">PqVr/ifkAQh+lVrdPIykXlFvg12GhhQFR8H9cUhphgg=:pTe9HRlQuMfJxAG6QCGq7UvoUpJzAzWGKy5SbZ+roSU=</Property>
 		<Property Name="target.webservices.ValidTimestampWindow" Type="Int">15</Property>
-		<Item Name="RoboRIO-Teensy-ADIS16448-Interface Example.vi" Type="VI" URL="../RoboRIO-Teensy-ADIS16448-Interface Example.vi"/>
-		<Item Name="RoboRIO-Teensy-ADIS16448-Interface.lvlib" Type="Library" URL="../ADIS16448_RoboRIO_Teensy_Interface_Lib/RoboRIO-Teensy-ADIS16448-Interface.lvlib"/>
+		<Item Name="ADIS16448-Teensy Example.vi" Type="VI" URL="../ADIS16448-Teensy Example.vi"/>
+		<Item Name="ADIS16448-Teensy.lvlib" Type="Library" URL="../ADIS16448-Teensy/ADIS16448-Teensy.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
 			<Item Name="vi.lib" Type="Folder">
 				<Item Name="Check if File or Folder Exists.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/libraryn.llb/Check if File or Folder Exists.vi"/>
