@@ -1,6 +1,6 @@
 [My Computer]
-My Computer = "192.168.65.1"
+My Computer = "10.26.55.104"
 
 [roboRIO]
-roboRIO = "172.22.11.2"
+roboRIO = "10.26.55.103"
 
