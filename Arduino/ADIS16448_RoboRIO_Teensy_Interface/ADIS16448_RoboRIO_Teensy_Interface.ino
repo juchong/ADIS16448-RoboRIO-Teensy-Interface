@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  January 2017
+//  February 2017
 //  Author: Juan Jose Chong <juan.chong@analog.com>
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  ADIS16448_RoboRIO_Teensy_Interface.ino
@@ -71,8 +71,12 @@
 int16_t *burstData;
 float scaledData[11];
 float pitch, roll, yaw, xdelta, ydelta, zdelta;
-String datapacket = "";
+float datapacket1[17];
+float datapacket2[17];
+String serialpacket = "";
 String separator = ',';
+bool pingpong = true;
+bool freezepingpong = false;
 
 // Initialize calibration registers
 float calDataX, calDataY, calDataZ = 0;
@@ -144,75 +148,87 @@ void grabData() {
 	    calibrateTeensy();
 	}
 	else {
-	    burstData = IMU.burstRead(); // Read data and insert into array
-	    scaleData(); // Scale IMU data
+    burstData = IMU.burstRead(); // Read data and insert into array
+    scaleData(); // Scale IMU data
+    
+    // Calculate delta time from last interrupt
+    deltat = micros() - oldtime; 
+    if (deltat > 2000) { // Check for micros() rollover and correct - dirty, but works
+      deltat = 1025;
+    }
+    oldtime = micros(); // Update delta time variable for next iteration
+    
+    // Integrate gyros over time
+    SGI.update(scaledData[0], scaledData[1], scaledData[2], deltat, resetGyroFlag); 
+    
+    // Compensate for IMU orientation (IMU is mounted upside-down when on an MXP breakout board)
+    if (initOrientation == true) {
+      AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
+    }
+    else {
+      AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
+    }
+    
+    // Clear reset gyro flag after reset has been performed
+    if (resetGyroFlag == 1) {
+      resetGyroFlag = 0;
+    }
+    
+    // Gather packet data...
+    pitch = AHRS.getPitch();
+    roll = AHRS.getRoll();
+    yaw = AHRS.getYaw();
+    xdelta = SGI.getX();
+    ydelta = SGI.getY();
+    zdelta = SGI.getZ();
+    
+    // PingPong between arrays such that data is not overwritten when writing 
+    // to the serial port while an ISR is generated
 
-	    // Calculate delta time from last interrupt
-	    deltat = micros() - oldtime; 
-	    if (deltat > 2000) { // Check for micros() rollover and correct - dirty, but works
-	      deltat = 1025;
-	    }
-	    oldtime = micros(); // Update delta time variable for next iteration
-	    
-	    // Integrate gyros over time
-	    SGI.update(scaledData[0], scaledData[1], scaledData[2], deltat, resetGyroFlag); 
-	  	
-	  	// Compensate for IMU orientation (IMU is mounted upside-down when on an MXP breakout board)
-	    if (initOrientation == true) {
-	      AHRS.update(scaledData[0], scaledData[1], scaledData[2], scaledData[3], scaledData[4], scaledData[5], scaledData[6], scaledData[7], scaledData[8], deltat); // Calculage Madgwick AHRS
-	    }
-	    else {
-	      AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
-	    }
-	    
-	    // Clear reset gyro flag after reset has been performed
-	    if (resetGyroFlag == 1) {
-	      resetGyroFlag = 0;
-	    }
+    // Ping array
+    if(pingpong == true) {
+      datapacket1[0] = pitch;
+      datapacket1[1] = roll;
+      datapacket1[2] = yaw;
+      datapacket1[3] = xdelta;
+      datapacket1[4] = ydelta;
+      datapacket1[5] = zdelta;
+      datapacket1[6] = scaledData[0];
+      datapacket1[7] = scaledData[1];
+      datapacket1[8] = scaledData[2];
+      datapacket1[9] = scaledData[3];
+      datapacket1[10] = scaledData[4];
+      datapacket1[11] = scaledData[5];
+      datapacket1[12] = scaledData[6];
+      datapacket1[13] = scaledData[7];
+      datapacket1[14] = scaledData[8];
+      datapacket1[15] = scaledData[9];
+      datapacket1[16] = scaledData[10];
+    }
 
-     // Insert data into datapacket in the ISR to avoid transmitting partial data
-        // Gather packet data...
-        pitch = AHRS.getPitch();
-        roll = AHRS.getRoll();
-        yaw = AHRS.getYaw();
-        xdelta = SGI.getX();
-        ydelta = SGI.getY();
-        zdelta = SGI.getZ();
-
-        // Build data packet for frame
-        datapacket += pitch;
-        datapacket += separator;
-        datapacket += roll;
-        datapacket += separator;
-        datapacket += yaw;
-        datapacket += separator;
-        datapacket += xdelta;
-        datapacket += separator;
-        datapacket += ydelta;
-        datapacket += separator;
-        datapacket += zdelta;
-        datapacket += separator;
-        datapacket += scaledData[0];
-        datapacket += separator;
-        datapacket += scaledData[1];
-        datapacket += separator;
-        datapacket += scaledData[2];
-        datapacket += separator;
-        datapacket += scaledData[3];
-        datapacket += separator;
-        datapacket += scaledData[4];
-        datapacket += separator;
-        datapacket += scaledData[5];
-        datapacket += separator;
-        datapacket += scaledData[6];
-        datapacket += separator;
-        datapacket += scaledData[7];
-        datapacket += separator;
-        datapacket += scaledData[8];
-        datapacket += separator;
-        datapacket += scaledData[9];
-        datapacket += separator;
-        datapacket += scaledData[10];
+    // Pong array
+    if(pingpong == false) {
+      datapacket2[0] = pitch;
+      datapacket2[1] = roll;
+      datapacket2[2] = yaw;
+      datapacket2[3] = xdelta;
+      datapacket2[4] = ydelta;
+      datapacket2[5] = zdelta;
+      datapacket2[6] = scaledData[0];
+      datapacket2[7] = scaledData[1];
+      datapacket2[8] = scaledData[2];
+      datapacket2[9] = scaledData[3];
+      datapacket2[10] = scaledData[4];
+      datapacket2[11] = scaledData[5];
+      datapacket2[12] = scaledData[6];
+      datapacket2[13] = scaledData[7];
+      datapacket2[14] = scaledData[8];
+      datapacket2[15] = scaledData[9];
+      datapacket2[16] = scaledData[10];
+    }
+    if(freezepingpong == false) {
+      pingpong = !pingpong;
+    }
 	}
 }
 
@@ -335,21 +351,39 @@ void loop() {
   printCounter ++;
     if (printCounter >= 10000) // Delay for writing data to the serial port
     {
-        // Print data packet to serial port
-        HWSERIAL.println(datapacket);
+      freezepingpong = true;
+      // Build data packet for frame
+      if(pingpong == true) {
+        for(int x = 0; x < 17; x++) {
+          serialpacket += datapacket1[x];
+          serialpacket += separator;
+        }
+      }
 
-        // Debug routines for testing
-        #ifdef DEBUG
-          HWSERIAL.println(calDataX);
-          HWSERIAL.println(calDataY);
-          HWSERIAL.println(calDataZ);
-        #endif
+      if(pingpong == false) {
+        for(int x = 0; x < 17; x++) {
+          serialpacket += datapacket2[x];
+          serialpacket += separator;
+        }
+      }
+    
+      // Print data packet to serial port
+      HWSERIAL.println(serialpacket);
 
-        // Clear data packet... just in case
-        //datapacket = "";
-        
-        // Reset print counter
-        printCounter = 0;
-    }
+      // Debug routines for testing
+      #ifdef DEBUG
+        HWSERIAL.println(calDataX);
+        HWSERIAL.println(calDataY);
+        HWSERIAL.println(calDataZ);
+      #endif
 
+      // Clear data packet... just in case
+      serialpacket = "";
+
+      // Unfreeze pingpong
+      freezepingpong = false;
+      
+      // Reset print counter
+      printCounter = 0;
+  }
 }
