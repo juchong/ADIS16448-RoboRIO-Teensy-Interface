@@ -184,8 +184,8 @@ void scaleData() {
     scaledData[6] = IMU.magnetometerScale(*(burstData + 7)); //Scale X Mag
     scaledData[7] = IMU.magnetometerScale(*(burstData + 8)); //Scale Y Mag
     scaledData[8] = IMU.magnetometerScale(*(burstData + 9)); //Scale Z Mag
-    //scaledData[9] = IMU.pressureScale(*(burstData + 10)); //Scale Pressure Sensor
-    //scaledData[10] = IMU.tempScale(*(burstData + 11)); //Scale Temp Sensor
+    scaledData[9] = IMU.pressureScale(*(burstData + 10)); //Scale Pressure Sensor
+    scaledData[10] = IMU.tempScale(*(burstData + 11)); //Scale Temp Sensor
 
     // Subtract offsets from gyro signals
     scaledData[0] = scaledData[0] - calDataX;
@@ -312,6 +312,28 @@ void loop() {
         datapacket += ydelta;
         datapacket += separator;
         datapacket += zdelta;
+        datapacket += separator;
+        datapacket += scaledData[0];
+        datapacket += separator;
+        datapacket += scaledData[1];
+        datapacket += separator;
+        datapacket += scaledData[2];
+        datapacket += separator;
+        datapacket += scaledData[3];
+        datapacket += separator;
+        datapacket += scaledData[4];
+        datapacket += separator;
+        datapacket += scaledData[5];
+        datapacket += separator;
+        datapacket += scaledData[6];
+        datapacket += separator;
+        datapacket += scaledData[7];
+        datapacket += separator;
+        datapacket += scaledData[8];
+        datapacket += separator;
+        datapacket += scaledData[9];
+        datapacket += separator;
+        datapacket += scaledData[10];
 
         // Print data packet to serial port
         HWSERIAL.println(datapacket);
