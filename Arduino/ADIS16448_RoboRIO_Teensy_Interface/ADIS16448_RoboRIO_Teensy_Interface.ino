@@ -169,6 +169,50 @@ void grabData() {
 	    if (resetGyroFlag == 1) {
 	      resetGyroFlag = 0;
 	    }
+
+     // Insert data into datapacket in the ISR to avoid transmitting partial data
+        // Gather packet data...
+        pitch = AHRS.getPitch();
+        roll = AHRS.getRoll();
+        yaw = AHRS.getYaw();
+        xdelta = SGI.getX();
+        ydelta = SGI.getY();
+        zdelta = SGI.getZ();
+
+        // Build data packet for frame
+        datapacket += pitch;
+        datapacket += separator;
+        datapacket += roll;
+        datapacket += separator;
+        datapacket += yaw;
+        datapacket += separator;
+        datapacket += xdelta;
+        datapacket += separator;
+        datapacket += ydelta;
+        datapacket += separator;
+        datapacket += zdelta;
+        datapacket += separator;
+        datapacket += scaledData[0];
+        datapacket += separator;
+        datapacket += scaledData[1];
+        datapacket += separator;
+        datapacket += scaledData[2];
+        datapacket += separator;
+        datapacket += scaledData[3];
+        datapacket += separator;
+        datapacket += scaledData[4];
+        datapacket += separator;
+        datapacket += scaledData[5];
+        datapacket += separator;
+        datapacket += scaledData[6];
+        datapacket += separator;
+        datapacket += scaledData[7];
+        datapacket += separator;
+        datapacket += scaledData[8];
+        datapacket += separator;
+        datapacket += scaledData[9];
+        datapacket += separator;
+        datapacket += scaledData[10];
 	}
 }
 
@@ -291,50 +335,6 @@ void loop() {
   printCounter ++;
     if (printCounter >= 10000) // Delay for writing data to the serial port
     {
-        
-        // Gather packet data...
-        pitch = AHRS.getPitch();
-        roll = AHRS.getRoll();
-        yaw = AHRS.getYaw();
-        xdelta = SGI.getX();
-        ydelta = SGI.getY();
-        zdelta = SGI.getZ();
-
-        // Build data packet for frame
-        datapacket += pitch;
-        datapacket += separator;
-        datapacket += roll;
-        datapacket += separator;
-        datapacket += yaw;
-        datapacket += separator;
-        datapacket += xdelta;
-        datapacket += separator;
-        datapacket += ydelta;
-        datapacket += separator;
-        datapacket += zdelta;
-        datapacket += separator;
-        datapacket += scaledData[0];
-        datapacket += separator;
-        datapacket += scaledData[1];
-        datapacket += separator;
-        datapacket += scaledData[2];
-        datapacket += separator;
-        datapacket += scaledData[3];
-        datapacket += separator;
-        datapacket += scaledData[4];
-        datapacket += separator;
-        datapacket += scaledData[5];
-        datapacket += separator;
-        datapacket += scaledData[6];
-        datapacket += separator;
-        datapacket += scaledData[7];
-        datapacket += separator;
-        datapacket += scaledData[8];
-        datapacket += separator;
-        datapacket += scaledData[9];
-        datapacket += separator;
-        datapacket += scaledData[10];
-
         // Print data packet to serial port
         HWSERIAL.println(datapacket);
 
@@ -346,7 +346,7 @@ void loop() {
         #endif
 
         // Clear data packet... just in case
-        datapacket = "";
+        //datapacket = "";
         
         // Reset print counter
         printCounter = 0;
