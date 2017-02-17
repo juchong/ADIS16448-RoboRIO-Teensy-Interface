@@ -30,7 +30,7 @@ An interface PCB with space for an onboard Teensy can be purchased from [OSHPark
 [Picture of PCB Here]
 
 ### Additional Libraries:
-This project requires the use of several libraries to properly compile. These are listed below:
+In addition to a properly installed/configured Teensyduino environment, this project requires the use of several libraries to properly compile. These are listed below:
 
 - [ADIS16448 Arduino Teensy Interface Driver](https://github.com/juchong/ADIS16448-Arduino-Teensy) 
 - [EEPROMEx](https://github.com/thijse/Arduino-EEPROMEx)
