@@ -59,6 +59,7 @@
 #include <SPI.h>
 #include <EEPROMex.h>
 
+// Uncomment to enable debug mode and print additional data to the serial port
 //#define DEBUG
 
 // Uncomment to overwrite garbage data in EEPROM with 0's
@@ -144,6 +145,7 @@ void grabData() {
 		calibrateOffsetRegisterIMU();
 	}
 
+  // If a calibration is triggered, skip calculations and only service the calibration accumulation
 	if (teensyCalFlag == true) {
 	    calibrateTeensy();
 	}
@@ -169,12 +171,7 @@ void grabData() {
       AHRS.update(scaledData[0], (scaledData[1] * -1), (scaledData[2] * -1), scaledData[3], (scaledData[4] * -1), (scaledData[5] * -1), scaledData[6], (scaledData[7] * -1), (scaledData[8] * -1), deltat); // Calculage Madgwick AHRS
     }
     
-    // Clear reset gyro flag after reset has been performed
-    if (resetGyroFlag == 1) {
-      resetGyroFlag = 0;
-    }
-    
-    // Gather packet data...
+    // Gather packet data
     pitch = AHRS.getPitch();
     roll = AHRS.getRoll();
     yaw = AHRS.getYaw();
@@ -183,7 +180,8 @@ void grabData() {
     zdelta = SGI.getZ();
     
     // PingPong between arrays such that data is not overwritten when writing 
-    // to the serial port while an ISR is generated
+    //  to the serial port while an ISR is generated. Disabling the ISR is not 
+    //  acceptable because data would potentially be lost when ISRs weren't serviced.
 
     // Ping array
     if(pingpong == true) {
@@ -226,14 +224,19 @@ void grabData() {
       datapacket2[15] = scaledData[9];
       datapacket2[16] = scaledData[10];
     }
+    // Continue ping-pong-ing until frozen
     if(freezepingpong == false) {
       pingpong = !pingpong;
+    }
+
+    // Clear reset gyro flag after reset has been performed
+    if (resetGyroFlag == 1) {
+      resetGyroFlag = 0;
     }
 	}
 }
 
 // Function used to scale all acquired data (scaling functions are included in ADIS16448.cpp)
-// Note pressure and temp aren't scaled since they're not passed to the RoboRIO
 void scaleData() {
     scaledData[0] = IMU.gyroScale(*(burstData + 1)); //Scale X Gyro
     scaledData[1] = IMU.gyroScale(*(burstData + 2)); //Scale Y Gyro
@@ -349,41 +352,43 @@ void serialEvent1() {
 
 void loop() {
   printCounter ++;
-    if (printCounter >= 10000) // Delay for writing data to the serial port
-    {
-      freezepingpong = true;
-      // Build data packet for frame
-      if(pingpong == true) {
-        for(int x = 0; x < 17; x++) {
-          serialpacket += datapacket1[x];
-          serialpacket += separator;
-        }
+  if (printCounter >= 10000) // Delay for writing data to the serial port
+  {
+    // Build data packet for frame from either ping or pong. Note that
+    //  whichever array is active, it will never be overwritten by servicing ISRs.
+    freezepingpong = true;
+    // Ping active
+    if(pingpong == true) {
+      for(int x = 0; x < 17; x++) {
+        serialpacket += datapacket1[x];
+        serialpacket += separator;
       }
+    }
+    // Pong active
+    if(pingpong == false) {
+      for(int x = 0; x < 17; x++) {
+        serialpacket += datapacket2[x];
+        serialpacket += separator;
+      }
+    }
+  
+    // Print data packet to serial port
+    HWSERIAL.println(serialpacket, 4);
 
-      if(pingpong == false) {
-        for(int x = 0; x < 17; x++) {
-          serialpacket += datapacket2[x];
-          serialpacket += separator;
-        }
-      }
+    // Debug routines for testing
+    #ifdef DEBUG
+      HWSERIAL.println(calDataX);
+      HWSERIAL.println(calDataY);
+      HWSERIAL.println(calDataZ);
+    #endif
+
+    // Clear data packet
+    serialpacket = "";
+
+    // Unfreeze pingpong
+    freezepingpong = false;
     
-      // Print data packet to serial port
-      HWSERIAL.println(serialpacket);
-
-      // Debug routines for testing
-      #ifdef DEBUG
-        HWSERIAL.println(calDataX);
-        HWSERIAL.println(calDataY);
-        HWSERIAL.println(calDataZ);
-      #endif
-
-      // Clear data packet... just in case
-      serialpacket = "";
-
-      // Unfreeze pingpong
-      freezepingpong = false;
-      
-      // Reset print counter
-      printCounter = 0;
+    // Reset print counter
+    printCounter = 0;
   }
 }
