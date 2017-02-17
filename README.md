@@ -12,12 +12,13 @@ The Teensy-based software currently offers:
 - Integrated angle outputs (XDelta, YDelta, ZDelta)
 - AHRS Madgwick outputs (Pitch, Roll, Yaw)
 - Instantaneous sensor rate outputs (XGyro, YGyro, ZGyro, XAccel, YAccel, ZAccel, XMag, YMag, ZMag, Baro, Temp)
-- Serial/UART output at ~30Hz - Note that this value can be changed in the main loop to suit the application
-- Onboard Teensy EEPROM storage for pre-recorded gyro offset values and a gyro offset calibration routine
-- Z+ / Z- orientation selection, delta angle offset reset via simple UART commands
+- Serial/UART output at ~30Hz (Note that this value can be changed in the main loop to suit the application)
+- Gyro offset null routine
+- Onboard Teensy EEPROM storage for compensating gyro drift using pre-recorded null values
+- Z+ / Z- orientation selection and delta angle offset reset via simple UART commands
 
 The LabVIEW-based software currently offers:
-- Receiving and decoding sensor data packets from the Teensy/sensor
+- Receiving and decoding sensor data packets from the Teensy/IMU
 - Inserting data into FGVs (Functional Global Variables) for easy, clean integration into robot projects
 - Simple, reliable, easy-to-use data acquisition
 
