@@ -360,20 +360,20 @@ void loop() {
     // Ping active
     if(pingpong == true) {
       for(int x = 0; x < 17; x++) {
-        serialpacket += datapacket1[x];
+        serialpacket += String(datapacket1[x],4);
         serialpacket += separator;
       }
     }
     // Pong active
     if(pingpong == false) {
       for(int x = 0; x < 17; x++) {
-        serialpacket += datapacket2[x];
+        serialpacket += String(datapacket2[x],4);
         serialpacket += separator;
       }
     }
   
     // Print data packet to serial port
-    HWSERIAL.println(serialpacket, 4);
+    HWSERIAL.println(serialpacket);
 
     // Debug routines for testing
     #ifdef DEBUG
